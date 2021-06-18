@@ -11,6 +11,13 @@ DISABLE_MASQUERADE = os.getenv("DISABLE_MASQUERADE")
 REPLICAS = [j for j in os.getenv("REPLICAS", "").split(",") if j]
 MONGO_URI = os.getenv("MONGO_URI")
 
+if REPLICAS:
+    if MONGO_URI:
+        raise ValueError("Simultanously specifying MONGO_URI and REPLICAS doesn't make sense")
+    MONGO_URI = "mongodb://%s/default?replicaSet=rs0" % (",".join(["%s:27017" % j for j in REPLICAS]))
+elif not MONGO_URI:
+    raise ValueError("MONGO_URI not specified")
+
 
 def generate_firewall_rules(disabled=False):
     default_policy = "REJECT" if DEBUG else "DROP"
