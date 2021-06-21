@@ -3,20 +3,21 @@ import asyncio
 import os
 import socket
 import sys
+import ipaddress
+import pymongo
 from motor.motor_asyncio import AsyncIOMotorClient
 
 FQDN = socket.getfqdn()
 DEBUG = os.getenv("DEBUG")
 DISABLE_MASQUERADE = os.getenv("DISABLE_MASQUERADE")
-REPLICAS = [j for j in os.getenv("REPLICAS", "").split(",") if j]
 MONGO_URI = os.getenv("MONGO_URI")
+mongo_uri = pymongo.uri_parser.parse_uri(MONGO_URI)
 
-if REPLICAS:
-    if MONGO_URI:
-        raise ValueError("Simultanously specifying MONGO_URI and REPLICAS doesn't make sense")
-    MONGO_URI = "mongodb://%s/default?replicaSet=rs0" % (",".join(["%s:27017" % j for j in REPLICAS]))
-elif not MONGO_URI:
-    raise ValueError("MONGO_URI not specified")
+ALLOW_MONGO_REPLICA_TRAFFIC = False
+
+#IF more than one replicas in mongo url, enable mongo traffic between replcas in firewall
+if len(mongo_uri["nodelist"]) > 1:
+    ALLOW_MONGO_REPLICA_TRAFFIC = True
 
 
 def generate_firewall_rules(disabled=False):
@@ -55,7 +56,7 @@ def generate_firewall_rules(disabled=False):
         yield "-A INPUT -p udp --dport 1194 -j ACCEPT -m comment --comment \"Allow OpenVPN UDP\""
         yield "-A INPUT -p udp --dport 500 -j ACCEPT -m comment --comment \"Allow IPsec IKE\""
         yield "-A INPUT -p udp --dport 4500 -j ACCEPT -m comment --comment \"Allow IPsec NAT traversal\""
-    if REPLICAS:
+    if ALLOW_MONGO_REPLICA_TRAFFIC:
         yield "-A INPUT -p tcp --dport 27017 -j ACCEPT -m set --match-set ipset4-mongo-replicas src -m comment --comment \"Allow MongoDB internode\""
     yield "-A INPUT -j INBOUND_BLOCKED"
 
@@ -99,10 +100,10 @@ def apply_firewall_rules(**kwargs):
 
 async def update_firewall_rules():
     print("Setting up firewall rules")
-    if REPLICAS:
+    if ALLOW_MONGO_REPLICA_TRAFFIC:
         # TODO: atomic update with `ipset restore`
-        for replica in REPLICAS:
-            for fam, _, _, _, addrs in socket.getaddrinfo(replica, None):
+        for replica in mongo_uri["nodelist"]:
+            for fam, _, _, _, addrs in socket.getaddrinfo(replica[0], None):
                 if fam == 10:
                     os.system("ipset add ipset6-mongo-replicas %s" % addrs[0])
                 elif fam == 2:
