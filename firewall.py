@@ -11,6 +11,7 @@ FQDN = socket.getfqdn()
 DEBUG = os.getenv("DEBUG")
 DISABLE_MASQUERADE = os.getenv("DISABLE_MASQUERADE")
 MONGO_URI = os.getenv("MONGO_URI")
+TCP_MSS_CLAMPING = int(os.getenv("TCP_MSS_CLAMPING", "1452"))
 mongo_uri = pymongo.uri_parser.parse_uri(MONGO_URI)
 
 ALLOW_MONGO_REPLICA_TRAFFIC = False
@@ -69,6 +70,12 @@ def generate_firewall_rules(disabled=False):
 
     yield ":OUTPUT DROP [0:0]"
     yield "-A OUTPUT -j ACCEPT"
+    yield "COMMIT"
+
+    yield "*mangle"
+    yield "-A FORWARD -p tcp -m tcp --tcp-flags SYN,RST SYN " \
+        "-m tcpmss --mss %d:1536 -j TCPMSS --set-mss %d " \
+        "-m comment --comment \"MSS clamping\"" % (TCP_MSS_CLAMPING+1, TCP_MSS_CLAMPING)
     yield "COMMIT"
 
     yield "*nat"
