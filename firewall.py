@@ -125,6 +125,8 @@ async def update_firewall_rules():
     os.system("ipset create -exist -quiet ipset4-mongo-replicas hash:ip")
     os.system("ipset create -exist -quiet ipset6-mongo-replicas hash:ip family inet6")
 
+    apply_firewall_rules(disabled=True)
+
     db = AsyncIOMotorClient(MONGO_URI).get_default_database()
 
     q = {
