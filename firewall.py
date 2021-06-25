@@ -126,6 +126,7 @@ async def update_firewall_rules():
     os.system("ipset create -exist -quiet ipset6-mongo-replicas hash:ip family inet6")
 
     apply_firewall_rules(disabled=True)
+    print("Looking up signed certificate for common name: %s" % FQDN)
 
     db = AsyncIOMotorClient(MONGO_URI).get_default_database()
 
@@ -136,7 +137,7 @@ async def update_firewall_rules():
 
     doc = await db.certidude_certificates.find_one(q)
     if not doc:
-        print("Unable to lookup signed certificate for %s" % FQDN)
+        print("Unable to lookup signed certificate for common name %s" % FQDN)
         sys.exit(1)
 
     apply_firewall_rules(disabled=doc["disabled"])
