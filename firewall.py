@@ -7,7 +7,8 @@ import ipaddress
 import pymongo
 from motor.motor_asyncio import AsyncIOMotorClient
 
-FQDN = socket.getfqdn()
+#For some reason socket.getfqdn() under alpine giving IP, getfqdn working fine under ubuntu
+FQDN = socket.gethostname()
 DEBUG = os.getenv("DEBUG")
 DISABLE_MASQUERADE = os.getenv("DISABLE_MASQUERADE")
 MONGO_URI = os.getenv("MONGO_URI")
